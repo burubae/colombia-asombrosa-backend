@@ -112,4 +112,17 @@ app.post("/finalize", async (req, res) => {
         });
       })
       .on("error", err => {
-       
+        console.error("❌ FFmpeg error:", err.message);
+        res.status(500).send("⚠️ Error al generar el video");
+      })
+      .save(outputVideo);
+
+  } catch (err) {
+    console.error("💥 Error inesperado en /finalize:", err);
+    res.status(500).send("⚠️ Error interno del servidor");
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`🚀 Servidor activo en http://localhost:${PORT}`);
+});
