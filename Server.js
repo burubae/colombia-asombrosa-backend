@@ -10,23 +10,22 @@ const app = express();
 const PORT = 3000;
 const BASE_DIR = path.join(__dirname, "tmp");
 
-// 🌍 Permitir solicitudes desde GitHub Pages
+// 🌐 Permitir solicitudes desde GitHub Pages
 app.use(cors({ origin: "https://burubae.github.io" }));
 app.use(express.json());
 
-// 🧱 Crear directorio temporal si no existe
+// 📁 Crear carpeta base si no existe
 if (!fs.existsSync(BASE_DIR)) {
   fs.mkdirSync(BASE_DIR, { recursive: true });
 }
 
-// 🗂️ Configuración de almacenamiento con streamId embebido en el nombre
+// 🧰 Configuración de almacenamiento
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const match = file.originalname.match(/^(\d+)_/);
     if (!match) {
       return cb(new Error("❌ No se pudo extraer streamId del nombre del archivo"), null);
     }
-
     const sessionId = match[1];
     const sessionDir = path.join(BASE_DIR, sessionId);
     fs.mkdirSync(sessionDir, { recursive: true });
@@ -39,19 +38,19 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage }).any();
 
-// 🔹 Subir un frame
+// 🖼️ Subida de frame
 app.post("/upload-frame", upload, (req, res) => {
   console.log("🖼️ Frame recibido:", req.files?.[0]?.originalname);
   res.status(200).send("✅ Frame recibido");
 });
 
-// 🔹 Subir audio
+// 🎤 Subida de audio
 app.post("/upload-audio", upload, (req, res) => {
   console.log("🎤 Audio recibido:", req.files?.[0]?.originalname);
   res.status(200).send("✅ Audio recibido");
 });
 
-// 🔹 Finalizar grabación y ensamblar el video
+// 🎬 Finalizar y generar video
 app.post("/finalize", async (req, res) => {
   const { streamId, fps = 10 } = req.body;
   if (!streamId) return res.status(400).send("❌ Falta streamId");
@@ -72,22 +71,24 @@ app.post("/finalize", async (req, res) => {
       return res.status(400).send("❌ No hay frames para procesar");
     }
 
-    // 📏 Detectar tamaño del primer frame
+    // 📏 Detectar tamaño del primer frame y redondear
     const firstFramePath = path.join(sessionDir, files[0]);
     const meta = await sharp(firstFramePath).metadata();
-    const resolution = `${meta.width}x${meta.height}`;
+    const width = meta.width % 2 === 0 ? meta.width : meta.width - 1;
+    const height = meta.height % 2 === 0 ? meta.height : meta.height - 1;
+    const resolution = `${width}x${height}`;
+
+    console.log(`🧮 Resolución ajustada: ${meta.width}x${meta.height} → ${resolution}`);
 
     const command = ffmpeg();
-    files.forEach(f => {
-      command.input(path.join(sessionDir, f));
-    });
+    files.forEach(f => command.input(path.join(sessionDir, f)));
 
     command
       .inputFPS(fps)
       .videoCodec("libx264")
       .outputFPS(fps)
       .outputOptions("-pix_fmt yuv420p")
-      .outputOptions("-s", resolution); // ⬅️ usa la resolución real
+      .outputOptions("-s", resolution); // ⬅️ resolución forzada
 
     const audioPath = path.join(sessionDir, `${streamId}_audio.webm`);
     if (fs.existsSync(audioPath)) {
@@ -101,18 +102,18 @@ app.post("/finalize", async (req, res) => {
       .on("end", () => {
         res.download(outputVideo, "grabacion_final.mp4", () => {
           fs.rmSync(sessionDir, { recursive: true, force: true });
-          console.log(`✅ Video entregado y limpieza completa para ${streamId}`);
+          console.log(`✅ Video entregado y archivos limpiados para ${streamId}`);
         });
       })
       .on("error", err => {
-        console.error("❌ Error FFmpeg:", err.message);
+        console.error("❌ FFmpeg error:", err.message);
         res.status(500).send("⚠️ Error al generar el video");
       })
       .save(outputVideo);
 
   } catch (err) {
     console.error("💥 Error general:", err);
-    res.status(500).send("⚠️ Fallo en la fase de finalización");
+    res.status(500).send("⚠️ Fallo durante la finalización");
   }
 });
 
