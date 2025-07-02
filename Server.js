@@ -11,6 +11,8 @@ const app = express();
 const PORT = 3000;
 const BASE_DIR = path.join(__dirname, "tmp");
 app.use(express.json());
+const cors = require("cors");
+app.use(cors());
 
 // 📁 Asegura el directorio temporal
 fs.mkdirSync(BASE_DIR, { recursive: true });
