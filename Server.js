@@ -49,6 +49,10 @@ const upload = multer({ storage });
 
 // 🔹 1. Recibir frame individual
 app.post("/upload-frame", upload.single("frame"), (req, res) => {
+console.log("📩 Body:", req.body);
+  console.log("🔍 Query:", req.query);
+
+
   res.status(200).send("🖼️ Frame recibido");
 });
 
