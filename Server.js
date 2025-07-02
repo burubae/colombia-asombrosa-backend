@@ -39,13 +39,13 @@ const upload = multer({ storage }).any();
 
 // 🔹 1. Subida de frame
 app.post("/upload-frame", upload, (req, res) => {
-  console.log("🖼️ Frame recibido:", req.files?.[0]?.originalname);
+  //console.log("🖼️ Frame recibido:", req.files?.[0]?.originalname);
   res.status(200).send("✅ Frame recibido");
 });
 
 // 🔹 2. Subida de audio
 app.post("/upload-audio", upload, (req, res) => {
-  console.log("🎤 Audio recibido:", req.files?.[0]?.originalname);
+ // console.log("🎤 Audio recibido:", req.files?.[0]?.originalname);
   res.status(200).send("✅ Audio recibido");
 });
 
