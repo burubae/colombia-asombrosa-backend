@@ -44,16 +44,16 @@ app.post("/upload-audio", upload, (req, res) => {
   res.send("✅ Audio recibido");
 });
 
-// 🎬 Finalización y ensamblaje del video
 app.post("/finalize", async (req, res) => {
   const { streamId, fps = 10 } = req.body;
   if (!streamId) return res.status(400).send("❌ Falta streamId");
 
   const sessionDir = path.join(BASE_DIR, String(streamId));
   const outputVideo = path.join(sessionDir, "final.mp4");
+  const txtPath = path.join(sessionDir, "frames.txt");
 
   try {
-    // 🗂️ Buscar y ordenar todos los frames
+    // 🔍 Detectar todos los frames válidos
     const allFiles = fs.readdirSync(sessionDir)
       .filter(f => f.startsWith(`${streamId}_frame_`) && f.endsWith(".jpg"))
       .sort((a, b) => {
@@ -62,7 +62,6 @@ app.post("/finalize", async (req, res) => {
         return aNum - bNum;
       });
 
-    // 🧪 Filtrar los que pesen más de 5 KB
     const validFrames = allFiles.filter(f => {
       const size = fs.statSync(path.join(sessionDir, f)).size;
       return size > 5000;
@@ -72,27 +71,28 @@ app.post("/finalize", async (req, res) => {
       return res.status(400).send("❌ No hay frames válidos para procesar");
     }
 
-    // 📐 Detectar resolución del primer frame y redondear
-    const firstValidPath = path.join(sessionDir, validFrames[0]);
-    const meta = await sharp(firstValidPath).metadata();
+    // 📏 Resolución del primer frame y corrección par
+    const meta = await sharp(path.join(sessionDir, validFrames[0])).metadata();
     const width = meta.width % 2 === 0 ? meta.width : meta.width - 1;
     const height = meta.height % 2 === 0 ? meta.height : meta.height - 1;
     const resolution = `${width}x${height}`;
-    console.log(`📏 Resolución: ${meta.width}x${meta.height} → corregida a ${resolution}`);
-    console.log(`🧼 Frames válidos: ${validFrames.length}/${allFiles.length}`);
+    console.log(`📐 Resolución ajustada: ${resolution}`);
 
-    // 🎥 Construcción del video con FFmpeg
-    const command = ffmpeg();
-    validFrames.forEach(f => {
-      command.input(path.join(sessionDir, f));
-    });
+    // 📝 Crear archivo frames.txt para FFmpeg
+    const duration = (1 / fps).toFixed(5);
+    const lines = validFrames.map(f => `file '${f}'\nduration ${duration}`);
+    lines.push(`file '${validFrames[validFrames.length - 1]}'`); // último frame sin duración
+    fs.writeFileSync(txtPath, lines.join("\n"));
 
-    command
-      .inputFPS(fps)
+    // 🎞️ Comenzar proceso con FFmpeg usando concat
+    const command = ffmpeg()
+      .input(txtPath)
+      .inputOptions("-f", "concat", "-safe", "0")
       .videoCodec("libx264")
-      .outputFPS(fps)
       .outputOptions([
         "-pix_fmt yuv420p",
+        "-movflags faststart",
+        `-r ${fps}`,
         `-s ${resolution}`
       ]);
 
@@ -103,12 +103,12 @@ app.post("/finalize", async (req, res) => {
 
     command
       .on("start", () => {
-        console.log(`🎞️ Iniciando render con FFmpeg para streamId ${streamId}`);
+        console.log(`🛠️ Generando video con ${validFrames.length} frames`);
       })
       .on("end", () => {
         res.download(outputVideo, "grabacion_final.mp4", () => {
           fs.rmSync(sessionDir, { recursive: true, force: true });
-          console.log(`✅ Video entregado y carpeta eliminada para streamId ${streamId}`);
+          console.log(`✅ Video listo y limpieza completa para ${streamId}`);
         });
       })
       .on("error", err => {
@@ -118,8 +118,8 @@ app.post("/finalize", async (req, res) => {
       .save(outputVideo);
 
   } catch (err) {
-    console.error("💥 Error inesperado en /finalize:", err);
-    res.status(500).send("⚠️ Error interno del servidor");
+    console.error("💥 Error en /finalize:", err);
+    res.status(500).send("⚠️ Error en la finalización de la grabación");
   }
 });
 
