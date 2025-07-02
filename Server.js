@@ -54,7 +54,7 @@ app.post("/finalize", (req, res) => {
   const { streamId, fps = 10 } = req.body;
   if (!streamId) return res.status(400).send("❌ Falta streamId");
 
-  const sessionDir = path.join(BASE_DIR, streamId);
+  const sessionDir = path.join(BASE_DIR, String(streamId));
   const outputVideo = path.join(sessionDir, "final.mp4");
 
   try {
