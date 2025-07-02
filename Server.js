@@ -4,7 +4,7 @@ const express = require("express");
 const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
-
+const cors = require("cors");
 const tmpDir = path.join(__dirname, "tmp");
 
 if (!fs.existsSync(tmpDir)) {
@@ -17,7 +17,7 @@ const app = express();
 const PORT = 3000;
 const BASE_DIR = path.join(__dirname, "tmp");
 app.use(express.json());
-const cors = require("cors");
+
 app.use(cors());
 
 // 📁 Asegura el directorio temporal
