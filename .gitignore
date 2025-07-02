@@ -1,0 +1,4 @@
+node_modules/
+tmp/
+*.sln
+.DS_Store
