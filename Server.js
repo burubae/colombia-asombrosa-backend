@@ -13,7 +13,6 @@ const BASE_DIR = path.join(__dirname, "tmp");
 app.use(cors({ origin: "https://burubae.github.io" }));
 app.use(express.json());
 
-// 🗂️ Crear carpeta temporal si no existe
 if (!fs.existsSync(BASE_DIR)) {
   fs.mkdirSync(BASE_DIR, { recursive: true });
 }
@@ -32,16 +31,13 @@ const storage = multer.diskStorage({
 const upload = multer({ storage }).any();
 
 app.post("/upload-frame", upload, (req, res) => {
-  console.log("🖼️ Frame recibido:", req.files?.[0]?.originalname);
   res.send("✅ Frame recibido");
 });
 
 app.post("/upload-audio", upload, (req, res) => {
-  console.log("🎤 Audio recibido:", req.files?.[0]?.originalname);
   res.send("✅ Audio recibido");
 });
 
-// 🎬 Ensamblar video con concat .txt
 app.post("/finalize", async (req, res) => {
   const { streamId, fps = 10 } = req.body;
   if (!streamId) return res.status(400).send("❌ Falta streamId");
@@ -68,19 +64,12 @@ app.post("/finalize", async (req, res) => {
       return res.status(400).send("❌ No hay frames válidos para procesar");
     }
 
-    const meta = await sharp(path.join(sessionDir, validFrames[0])).metadata();
-    const width = meta.width % 2 === 0 ? meta.width : meta.width - 1;
-    const height = meta.height % 2 === 0 ? meta.height : meta.height - 1;
-    const resolution = `${width}x${height}`;
-    console.log(`📐 Resolución ajustada: ${resolution}`);
-
-    // 📝 Crear archivo frames.txt
     const duration = (1 / fps).toFixed(5);
     const lines = validFrames.map(f => `file '${f}'\nduration ${duration}`);
     lines.push(`file '${validFrames[validFrames.length - 1]}'`);
     fs.writeFileSync(txtPath, lines.join("\n"));
 
-    // 🧪 Comando FFmpeg con concat
+    const resolution = "960x540";
     const command = ffmpeg()
       .input(txtPath)
       .inputOptions("-f", "concat", "-safe", "0")
@@ -89,7 +78,8 @@ app.post("/finalize", async (req, res) => {
         "-pix_fmt yuv420p",
         "-movflags faststart",
         `-r ${fps}`,
-        `-s ${resolution}`
+        `-s ${resolution}`,
+        "-preset ultrafast"
       ]);
 
     const audioPath = path.join(sessionDir, `${streamId}_audio.webm`);
@@ -98,23 +88,17 @@ app.post("/finalize", async (req, res) => {
     }
 
     command
-      .on("start", () => {
-        console.log(`🛠️ Generando video con ${validFrames.length} frames válidos`);
-      })
       .on("end", () => {
         res.download(outputVideo, "grabacion_final.mp4", () => {
           fs.rmSync(sessionDir, { recursive: true, force: true });
-          console.log(`✅ Video listo y limpieza completa para streamId ${streamId}`);
         });
       })
       .on("error", err => {
-        console.error("❌ FFmpeg error:", err.message);
         res.status(500).send("⚠️ Error al generar el video");
       })
       .save(outputVideo);
 
   } catch (err) {
-    console.error("💥 Error en /finalize:", err);
     res.status(500).send("⚠️ Error en la finalización");
   }
 });
