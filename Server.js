@@ -69,7 +69,7 @@ app.post("/finalize", async (req, res) => {
     lines.push(`file '${validFrames[validFrames.length - 1]}'`);
     fs.writeFileSync(txtPath, lines.join("\n"));
 
-    const resolution = "960x540";
+    const resolution = "640x360";
     const command = ffmpeg()
       .input(txtPath)
       .inputOptions("-f", "concat", "-safe", "0")
@@ -79,7 +79,7 @@ app.post("/finalize", async (req, res) => {
         "-movflags faststart",
         `-r ${fps}`,
         `-s ${resolution}`,
-        "-preset ultrafast"
+        "-async 1" // Mejora sincronización
       ]);
 
     const audioPath = path.join(sessionDir, `${streamId}_audio.webm`);
